@@ -209,7 +209,7 @@ Al terminar, tu repositorio de la actividad 6.1 debe incluir:
 
 - 4 pts – Flujo técnico correcto (uso de `git add`, `git commit`, `git status`, `git log`).
 - 3 pts – Evidencias de los distintos estados (`untracked`, staging, commits) en los archivos de checkpoints.
-- 3 pts – Calidad de la reflexión en `reflexion-6-1.md`.
+- 3 pts – Calidad de la reflexión en el documento `reflexion-6-1.md`.
 
 **Puntuación máxima: 10 puntos.**
 
