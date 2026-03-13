@@ -19,12 +19,20 @@ def safe_read_text(path: Path) -> str:
         return ''
 
 def text_stats(text: str) -> dict:
-    text = text.replace('', '').replace('', '')
-    words = [w for w in text.replace('', '').split() if w.strip()]
-    headings = sum(1 for line in text.split('') if line.lstrip().startswith('#'))
-    images = text.count('![')
-    links = text.count('](')
+    # Normaliza saltos de línea (CRLF/CR -> LF)
+    text = text.replace('\r\n', '\n').replace('\r', '\n')
+
+    # Conteo de palabras (split() ya ignora espacios múltiples)
+    words = [w for w in text.replace('\n', ' ').split() if w.strip()]
+
+    # Encabezados Markdown: líneas que empiezan por '#'
+    headings = sum(1 for line in text.split('\n') if line.lstrip().startswith('#'))
+
+    # Métricas simples
+    images = text.count('!')
+    links = text.count('
     code_fences = text.count('```')
+
     return {
         'chars': len(text),
         'words': len(words),
