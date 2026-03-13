@@ -1,5 +1,5 @@
 
-name: Evaluación automática (Avanzada + IA) [FIX v2]
+name: Evaluación automática (Avanzada + IA) [FIX v3]
 
 permissions:
   contents: read
@@ -37,15 +37,17 @@ jobs:
         run: |
           python tools/evaluar_repo.py             --repo-root .             --min-commits "${{ github.event.inputs.min_commits != '' && github.event.inputs.min_commits || '3' }}"             --required   "${{ github.event.inputs.required_files != '' && github.event.inputs.required_files || 'README.md,reflexion-6-1.md' }}"             --outdir reportes
 
-      - name: Resumen en Job Summary
+      - name: Resumen en Job Summary (render perfecto)
         if: always()
         run: |
-          echo "### Informe de evaluación" >> $GITHUB_STEP_SUMMARY
-          echo "Repositorio: ${{ github.repository }}" >> $GITHUB_STEP_SUMMARY
-          echo "Commit: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
-          echo "Ejecutado por: ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          cat reportes/informe.md >> $GITHUB_STEP_SUMMARY
+          {
+            echo "### Informe de evaluación";
+            echo "";
+            # Añade dos espacios al final de cada línea para que GitHub Summary
+            # respete los saltos de línea de Markdown y no "aplane" el contenido
+            sed 's/$/  /' reportes/informe.md;
+            echo "";
+          } >> $GITHUB_STEP_SUMMARY
 
       - name: Publicar artifacts evaluación
         if: always()
@@ -124,8 +126,10 @@ jobs:
       - name: Resumen IA (Job Summary)
         if: steps.gate.outputs.has_ai == 'true'
         run: |
-          echo "## Retroalimentación generada por IA" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          sed -n '1,120p' reportes/retro.md >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "_(Descarga el DOCX completo en artifacts.)_" >> $GITHUB_STEP_SUMMARY
+          {
+            echo "## Retroalimentación generada por IA";
+            echo "";
+            sed 's/$/  /' reportes/retro.md;
+            echo "";
+            echo "_(Descarga el DOCX completo en artifacts.)_";
+          } >> $GITHUB_STEP_SUMMARY

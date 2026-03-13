@@ -19,20 +19,12 @@ def safe_read_text(path: Path) -> str:
         return ''
 
 def text_stats(text: str) -> dict:
-    # Normaliza saltos de línea (CRLF/CR -> LF)
-    text = text.replace('\r\n', '\n').replace('\r', '\n')
-
-    # Conteo de palabras (split() ya ignora espacios múltiples)
+    text = text.replace('\n', '\n').replace('', '')
     words = [w for w in text.replace('\n', ' ').split() if w.strip()]
-
-    # Encabezados Markdown: líneas que empiezan por '#'
     headings = sum(1 for line in text.split('\n') if line.lstrip().startswith('#'))
-
-    # Métricas simples
-    images = text.count('!')
+    images = text.count('![')
     links = text.count('](')
     code_fences = text.count('```')
-
     return {
         'chars': len(text),
         'words': len(words),
@@ -71,7 +63,7 @@ def build_tree(root: Path) -> str:
 
 def analyze_commits() -> dict:
     try:
-        log = run("git log --pretty=format:%h|%an|%ad|%s --date=iso").strip().split('')
+        log = run("git log --pretty=format:%h|%an|%ad|%s --date=iso").strip().split('\n')
     except subprocess.CalledProcessError:
         return {'count': 0, 'items': [], 'avg_msg_len': 0, 'quality': 0.0}
     commits = []
