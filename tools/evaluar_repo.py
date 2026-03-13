@@ -30,7 +30,7 @@ def text_stats(text: str) -> dict:
 
     # Métricas simples
     images = text.count('!')
-    links = text.count('
+    links = text.count('](')
     code_fences = text.count('```')
 
     return {
