@@ -1,5 +1,5 @@
 
-name: Evaluación automática (Avanzada + IA) [FIX]
+name: Evaluación automática (Avanzada + IA) [FIX v2]
 
 permissions:
   contents: read
@@ -61,8 +61,15 @@ jobs:
   ia:
     name: Redactar retro con IA
     needs: evaluar
-    if: ${{ secrets.AZURE_OPENAI_API_KEY || secrets.OPENAI_API_KEY }}
     runs-on: ubuntu-latest
+
+    env:
+      AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
+      AZURE_OPENAI_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
+      AZURE_OPENAI_DEPLOYMENT: ${{ secrets.AZURE_OPENAI_DEPLOYMENT }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -77,28 +84,36 @@ jobs:
         run: |
           echo "Contenido de reportes:" && ls -la reportes || true
 
+      - name: Detectar credenciales IA
+        id: gate
+        run: |
+          if [ -n "${AZURE_OPENAI_API_KEY}" ] || [ -n "${OPENAI_API_KEY}" ]; then
+            echo "has_ai=true" >> $GITHUB_OUTPUT
+            echo "Se han encontrado credenciales de IA."
+          else
+            echo "has_ai=false" >> $GITHUB_OUTPUT
+            echo "No hay credenciales de IA. Se omite la redacción con IA."
+          fi
+
       - name: Configurar Python
+        if: steps.gate.outputs.has_ai == 'true'
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
       - name: Instalar dependencias mínimas
+        if: steps.gate.outputs.has_ai == 'true'
         run: |
           python -m pip install --upgrade pip
           python -m pip install python-docx requests
 
       - name: Ejecutar redacción con IA
-        env:
-          AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
-          AZURE_OPENAI_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
-          AZURE_OPENAI_DEPLOYMENT: ${{ secrets.AZURE_OPENAI_DEPLOYMENT }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
+        if: steps.gate.outputs.has_ai == 'true'
         run: |
           python tools/ai_redactor.py
 
       - name: Publicar artifacts IA
-        if: always()
+        if: steps.gate.outputs.has_ai == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: retroalimentacion-ia
@@ -107,7 +122,7 @@ jobs:
             reportes/retro.docx
 
       - name: Resumen IA (Job Summary)
-        if: always()
+        if: steps.gate.outputs.has_ai == 'true'
         run: |
           echo "## Retroalimentación generada por IA" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
