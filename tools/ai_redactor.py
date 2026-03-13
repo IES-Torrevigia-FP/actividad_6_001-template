@@ -9,15 +9,12 @@ IN_JSON = REPORT_DIR / 'informe.json'
 OUT_MD  = REPORT_DIR / 'retro.md'
 OUT_DOCX= REPORT_DIR / 'retro.docx'
 
-# Helpers
-
 def read_opt(path: Path, limit=8000):
     try:
         txt = path.read_text(encoding='utf-8', errors='ignore')
         return txt[:limit]
     except Exception:
         return ''
-
 
 def azure_openai_chat(endpoint, api_key, deployment, messages):
     url = f"{endpoint}openai/deployments/{deployment}/chat/completions?api-version=2024-08-01-preview"
@@ -28,7 +25,6 @@ def azure_openai_chat(endpoint, api_key, deployment, messages):
     data = r.json()
     return data['choices'][0]['message']['content']
 
-
 def openai_chat(api_key, model, messages):
     url = "https://api.openai.com/v1/chat/completions"
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
@@ -37,7 +33,6 @@ def openai_chat(api_key, model, messages):
     r.raise_for_status()
     data = r.json()
     return data['choices'][0]['message']['content']
-
 
 def build_prompt(resumen: dict, readme_excerpt: str, reflex_excerpt: str):
     sys_prompt = (
@@ -74,7 +69,6 @@ Objetivo:
 """
     return sys_prompt, user_prompt
 
-
 def md_to_docx(md_text: str, out_path: Path):
     doc = Document()
     doc.add_heading('Informe formal – Retroalimentación', level=1)
@@ -89,11 +83,10 @@ def md_to_docx(md_text: str, out_path: Path):
         elif line.startswith('- '):
             doc.add_paragraph(line[2:].strip(), style='List Bullet')
         elif '|' in line and line.strip().startswith('|'):
-            doc.add_paragraph(line)  # representación simple
+            doc.add_paragraph(line)
         else:
             doc.add_paragraph(line)
     doc.save(out_path)
-
 
 def main():
     REPORT_DIR.mkdir(parents=True, exist_ok=True)

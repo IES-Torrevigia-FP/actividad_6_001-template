@@ -1,5 +1,9 @@
 
-name: Evaluación automática (Avanzada + IA)
+name: Evaluación automática (Avanzada + IA) [FIX]
+
+permissions:
+  contents: read
+  pull-requests: write
 
 on:
   push:
@@ -30,11 +34,8 @@ jobs:
           python-version: '3.11'
 
       - name: Ejecutar evaluación
-        env:
-          MIN_COMMITS: ${{ github.event.inputs.min_commits || '3' }}
-          REQUIRED_FILES: ${{ github.event.inputs.required_files || 'README.md,reflexion-6-1.md' }}
         run: |
-          python tools/evaluar_repo.py             --repo-root .             --min-commits "$MIN_COMMITS"             --required "$REQUIRED_FILES"             --outdir reportes
+          python tools/evaluar_repo.py             --repo-root .             --min-commits "${{ github.event.inputs.min_commits != '' && github.event.inputs.min_commits || '3' }}"             --required   "${{ github.event.inputs.required_files != '' && github.event.inputs.required_files || 'README.md,reflexion-6-1.md' }}"             --outdir reportes
 
       - name: Resumen en Job Summary
         if: always()
@@ -60,6 +61,7 @@ jobs:
   ia:
     name: Redactar retro con IA
     needs: evaluar
+    if: ${{ secrets.AZURE_OPENAI_API_KEY || secrets.OPENAI_API_KEY }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -70,6 +72,10 @@ jobs:
         with:
           name: informe-evaluacion
           path: reportes
+
+      - name: Verificar archivos descargados
+        run: |
+          echo "Contenido de reportes:" && ls -la reportes || true
 
       - name: Configurar Python
         uses: actions/setup-python@v5
@@ -83,11 +89,9 @@ jobs:
 
       - name: Ejecutar redacción con IA
         env:
-          # Azure OpenAI (preferido)
           AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
           AZURE_OPENAI_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
           AZURE_OPENAI_DEPLOYMENT: ${{ secrets.AZURE_OPENAI_DEPLOYMENT }}
-          # OpenAI estándar (alternativa)
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
         run: |
