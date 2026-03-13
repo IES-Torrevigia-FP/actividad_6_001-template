@@ -221,10 +221,8 @@ def main():
         return f"![score](https://img.shields.io/badge/nota-{score}%2F10-{color})"
 
     md = []
-    md.append(f"# Informe de evaluación – {datetime.utcnow().isoformat(timespec='seconds')}Z
-")
-    md.append(badge(total) + '
-')
+    md.append(f"# Informe de evaluación – {datetime.utcnow().isoformat(timespec='seconds')}Z")
+    md.append(badge(total) + '')
     md.append(f"**Rama por defecto:** `{default_branch}`  ")
     md.append(f"**Mínimo de commits esperado:** {min_commits}  ")
     md.append('')
@@ -236,8 +234,7 @@ def main():
     md.append(f"| README.md | {s_readme}/2 |")
     md.append(f"| Uso de Git | {s_git}/2 |")
     md.append(f"| Evidencias | {s_evid}/2 |")
-    md.append(f"| **Total** | **{total}/10** |
-")
+    md.append(f"| **Total** | **{total}/10** |")
 
     if missing:
         md.append('> ⚠️ **Faltan archivos obligatorios:** ' + ', '.join(missing))
@@ -249,20 +246,16 @@ def main():
     md.append(f"- Imágenes: {readme_stats.get('images',0)}  ")
     md.append(f"- Enlaces: {readme_stats.get('links',0)}  ")
 
-    md.append('
-## Commits')
+    md.append('## Commits')
     md.append(f"- Número de commits: **{commits_info['count']}**  ")
     md.append(f"- Calidad media de mensajes: **{commits_info['quality']}**  ")
     md.append(f"- Longitud media del mensaje: **{commits_info['avg_msg_len']}**  ")
     md.append('')
     md.append('<details><summary>Ver listado</summary>')
-    md.append('
-')
+    md.append('')
     for c in commits_info['items'][:50]:
         md.append(f"- `{c['short']}` {c['date']} — {c['message']} (score {c['score']})")
-    md.append('
-</details>
-')
+    md.append('</details>')
 
     md.append('## Evidencias detectadas (heurística)')
     if evidencias_presentes:
@@ -272,19 +265,16 @@ def main():
         md.append('- No se detectaron evidencias con la convención esperada.')
 
     if files_info['large_files']:
-        md.append('
-## Archivos grandes (>=10MB)')
+        md.append('## Archivos grandes (>=10MB)')
         for lf in files_info['large_files']:
             md.append(f"- {lf['path']} — {lf['size']} bytes")
 
-    md.append('
-## Árbol del repositorio (resumen)')
+    md.append('## Árbol del repositorio (resumen)')
     md.append('```')
     md.append(safe_read_text(outdir / 'arbol.txt')[:4000])
     md.append('```')
 
-    (outdir / 'informe.md').write_text('
-'.join(md), encoding='utf-8')
+    (outdir / 'informe.md').write_text(''.join(md), encoding='utf-8')
     print(f"Informe generado en: {outdir}/informe.md")
 
 if __name__ == '__main__':
