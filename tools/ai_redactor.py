@@ -17,11 +17,34 @@ def read_opt(path: Path, limit=8000):
         return ''
 
 def azure_openai_chat(endpoint, api_key, deployment, messages):
-    url = f"{endpoint}openai/deployments/{deployment}/chat/completions?api-version=2024-08-01-preview"
+    endpoint = (endpoint or '').strip()
+    deployment = (deployment or '').strip()
+    if not endpoint:
+        raise RuntimeError('AZURE_OPENAI_ENDPOINT está vacío.')
+    if not deployment:
+        raise RuntimeError('AZURE_OPENAI_DEPLOYMENT está vacío.')
+
+    # Soporta endpoint base (https://recurso.openai.azure.com)
+    # y endpoint que ya incluya /openai.
+    endpoint = endpoint.rstrip('/')
+    if endpoint.endswith('/openai'):
+        base = endpoint
+    else:
+        base = f"{endpoint}/openai"
+
+    url = f"{base}/deployments/{deployment}/chat/completions?api-version=2024-08-01-preview"
     headers = {"api-key": api_key, "Content-Type": "application/json"}
     payload = {"messages": messages, "temperature": 0.2, "max_tokens": 1200}
     r = requests.post(url, headers=headers, json=payload, timeout=60)
-    r.raise_for_status()
+    try:
+        r.raise_for_status()
+    except requests.HTTPError as e:
+        # No imprimimos secretos; sólo detalles útiles de diagnóstico.
+        body = (r.text or '')[:500]
+        raise RuntimeError(
+            f"Error Azure OpenAI HTTP {r.status_code}. "
+            f"Revisa endpoint y deployment. URL usada: {url}. Respuesta: {body}"
+        ) from e
     data = r.json()
     return data['choices'][0]['message']['content']
 

@@ -34,8 +34,15 @@ jobs:
           python-version: '3.11'
 
       - name: Ejecutar evaluación
+        env:
+          MIN_COMMITS: ${{ github.event_name == 'workflow_dispatch' && inputs.min_commits || '3' }}
+          REQUIRED_FILES: ${{ github.event_name == 'workflow_dispatch' && inputs.required_files || 'README.md,reflexion-6-1.md' }}
         run: |
-          python tools/evaluar_repo.py             --repo-root .             --min-commits "${{ github.event.inputs.min_commits != '' && github.event.inputs.min_commits || '3' }}"             --required   "${{ github.event.inputs.required_files != '' && github.event.inputs.required_files || 'README.md,reflexion-6-1.md' }}"             --outdir reportes
+          python tools/evaluar_repo.py \
+            --repo-root . \
+            --min-commits "$MIN_COMMITS" \
+            --required "$REQUIRED_FILES" \
+            --outdir reportes
 
       - name: Resumen en Job Summary (render perfecto)
         if: always()
@@ -45,7 +52,11 @@ jobs:
             echo "";
             # Añade dos espacios al final de cada línea para que GitHub Summary
             # respete los saltos de línea de Markdown y no "aplane" el contenido
-            sed 's/$/  /' reportes/informe.md;
+            if [ -f reportes/informe.md ]; then
+              sed 's/$/  /' reportes/informe.md;
+            else
+              echo "_No se generó reportes/informe.md por un error en pasos anteriores._";
+            fi
             echo "";
           } >> $GITHUB_STEP_SUMMARY
 
@@ -129,7 +140,11 @@ jobs:
           {
             echo "## Retroalimentación generada por IA";
             echo "";
-            sed 's/$/  /' reportes/retro.md;
+            if [ -f reportes/retro.md ]; then
+              sed 's/$/  /' reportes/retro.md;
+            else
+              echo "_No se generó reportes/retro.md por un error en pasos anteriores._";
+            fi
             echo "";
             echo "_(Descarga el DOCX completo en artifacts.)_";
           } >> $GITHUB_STEP_SUMMARY
