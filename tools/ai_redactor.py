@@ -1,6 +1,7 @@
 
 #!/usr/bin/env python3
 import os, json, requests
+from urllib.parse import urlparse
 from pathlib import Path
 from docx import Document
 
@@ -24,41 +25,61 @@ def azure_openai_chat(endpoint, api_key, deployment, messages):
     if not deployment:
         raise RuntimeError('AZURE_OPENAI_DEPLOYMENT está vacío.')
 
-    # Soporta endpoint base (https://recurso.openai.azure.com),
-    # endpoint con /openai, y endpoint v1 con /openai/v1.
-    endpoint = endpoint.rstrip('/')
-    if endpoint.endswith('/openai/v1'):
-        url = f"{endpoint}/chat/completions"
-        headers = {"api-key": api_key, "Content-Type": "application/json"}
+    # Soporta estos formatos en AZURE_OPENAI_ENDPOINT:
+    # - https://recurso.openai.azure.com
+    # - https://recurso.openai.azure.com/openai
+    # - https://recurso.openai.azure.com/openai/v1
+    # - URL completa de llamada (se reduce a origen y ruta base correcta)
+    parsed = urlparse(endpoint)
+    if parsed.scheme and parsed.netloc:
+        origin = f"{parsed.scheme}://{parsed.netloc}"
+        path = (parsed.path or '').rstrip('/')
+    else:
+        endpoint = endpoint.rstrip('/')
+        slash = endpoint.find('/', endpoint.find('://') + 3) if '://' in endpoint else -1
+        origin = endpoint if slash == -1 else endpoint[:slash]
+        path = '' if slash == -1 else endpoint[slash:].rstrip('/')
+
+    # Si pegaron una URL completa (.../openai/deployments/.../chat/completions),
+    # nos quedamos con el modo clásico /openai.
+    if '/openai/v1' in path:
+        mode = 'v1'
+    else:
+        mode = 'classic'
+
+    headers = {"api-key": api_key, "Content-Type": "application/json"}
+    errors = []
+
+    if mode == 'v1':
+        url = f"{origin}/openai/v1/chat/completions"
         payload = {
             "model": deployment,
             "messages": messages,
             "temperature": 0.2,
             "max_tokens": 1200,
         }
-    elif endpoint.endswith('/openai'):
-        base = endpoint
-        url = f"{base}/deployments/{deployment}/chat/completions?api-version=2024-08-01-preview"
-        headers = {"api-key": api_key, "Content-Type": "application/json"}
-        payload = {"messages": messages, "temperature": 0.2, "max_tokens": 1200}
+        r = requests.post(url, headers=headers, json=payload, timeout=60)
+        if r.ok:
+            data = r.json()
+            return data['choices'][0]['message']['content']
+        errors.append((r.status_code, url, (r.text or '')[:500]))
     else:
-        base = f"{endpoint}/openai"
-        url = f"{base}/deployments/{deployment}/chat/completions?api-version=2024-08-01-preview"
-        headers = {"api-key": api_key, "Content-Type": "application/json"}
-        payload = {"messages": messages, "temperature": 0.2, "max_tokens": 1200}
+        api_versions = ['2025-01-01-preview', '2024-08-01-preview']
+        for api_version in api_versions:
+            url = f"{origin}/openai/deployments/{deployment}/chat/completions?api-version={api_version}"
+            payload = {"messages": messages, "temperature": 0.2, "max_tokens": 1200}
+            r = requests.post(url, headers=headers, json=payload, timeout=60)
+            if r.ok:
+                data = r.json()
+                return data['choices'][0]['message']['content']
+            errors.append((r.status_code, url, (r.text or '')[:500]))
 
-    r = requests.post(url, headers=headers, json=payload, timeout=60)
-    try:
-        r.raise_for_status()
-    except requests.HTTPError as e:
-        # No imprimimos secretos; sólo detalles útiles de diagnóstico.
-        body = (r.text or '')[:500]
-        raise RuntimeError(
-            f"Error Azure OpenAI HTTP {r.status_code}. "
-            f"Revisa endpoint y deployment. URL usada: {url}. Respuesta: {body}"
-        ) from e
-    data = r.json()
-    return data['choices'][0]['message']['content']
+    # No imprimimos secretos; sólo diagnóstico de URL/status y body truncado.
+    status, url, body = errors[-1]
+    raise RuntimeError(
+        f"Error Azure OpenAI HTTP {status}. Revisa endpoint y deployment. "
+        f"URL usada: {url}. Respuesta: {body}"
+    )
 
 def openai_chat(api_key, model, messages):
     url = "https://api.openai.com/v1/chat/completions"
