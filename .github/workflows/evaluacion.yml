@@ -77,11 +77,11 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
+      AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_ENDPOINT || vars.AZURE_OPENAI_ENDPOINT }}
       AZURE_OPENAI_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
-      AZURE_OPENAI_DEPLOYMENT: ${{ secrets.AZURE_OPENAI_DEPLOYMENT }}
+      AZURE_OPENAI_DEPLOYMENT: ${{ secrets.AZURE_OPENAI_DEPLOYMENT || vars.AZURE_OPENAI_DEPLOYMENT }}
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-      OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
+      OPENAI_MODEL: ${{ secrets.OPENAI_MODEL || vars.OPENAI_MODEL }}
 
     steps:
       - name: Checkout
@@ -102,12 +102,30 @@ jobs:
       - name: Detectar credenciales IA
         id: gate
         run: |
-          if [ -n "${AZURE_OPENAI_API_KEY}" ] || [ -n "${OPENAI_API_KEY}" ]; then
+          has_azure=false
+          has_openai=false
+
+          if [ -n "${AZURE_OPENAI_ENDPOINT}" ] && [ -n "${AZURE_OPENAI_API_KEY}" ] && [ -n "${AZURE_OPENAI_DEPLOYMENT}" ]; then
+            has_azure=true
+          fi
+
+          if [ -n "${OPENAI_API_KEY}" ] && [ -n "${OPENAI_MODEL}" ]; then
+            has_openai=true
+          fi
+
+          if [ "$has_azure" = true ] || [ "$has_openai" = true ]; then
             echo "has_ai=true" >> $GITHUB_OUTPUT
-            echo "Se han encontrado credenciales de IA."
+            echo "Se detectó configuración válida de IA (Azure u OpenAI)."
           else
             echo "has_ai=false" >> $GITHUB_OUTPUT
-            echo "No hay credenciales de IA. Se omite la redacción con IA."
+            echo "No hay configuración completa de IA. Se omite la redacción con IA."
+            echo "Diagnóstico (true/false):"
+            [ -n "${AZURE_OPENAI_ENDPOINT}" ] && echo "- AZURE_OPENAI_ENDPOINT: true" || echo "- AZURE_OPENAI_ENDPOINT: false"
+            [ -n "${AZURE_OPENAI_API_KEY}" ] && echo "- AZURE_OPENAI_API_KEY: true" || echo "- AZURE_OPENAI_API_KEY: false"
+            [ -n "${AZURE_OPENAI_DEPLOYMENT}" ] && echo "- AZURE_OPENAI_DEPLOYMENT: true" || echo "- AZURE_OPENAI_DEPLOYMENT: false"
+            [ -n "${OPENAI_API_KEY}" ] && echo "- OPENAI_API_KEY: true" || echo "- OPENAI_API_KEY: false"
+            [ -n "${OPENAI_MODEL}" ] && echo "- OPENAI_MODEL: true" || echo "- OPENAI_MODEL: false"
+            echo "Evento: ${GITHUB_EVENT_NAME}"
           fi
 
       - name: Configurar Python
