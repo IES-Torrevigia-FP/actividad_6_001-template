@@ -59,7 +59,7 @@ def build_tree(root: Path) -> str:
             if rel == Path('.') and f.startswith('.') and 'github' not in f:
                 pass
             lines.append(f"{indent}{f}")
-    return ''.join(lines)
+    return '\n'.join(lines)
 
 def analyze_commits() -> dict:
     try:
@@ -274,7 +274,7 @@ def main():
     md.append(safe_read_text(outdir / 'arbol.txt')[:4000])
     md.append('```')
 
-    (outdir / 'informe.md').write_text(''.join(md), encoding='utf-8')
+    (outdir / 'informe.md').write_text('\n'.join(md) + '\n', encoding='utf-8')
     print(f"Informe generado en: {outdir}/informe.md")
 
 if __name__ == '__main__':
