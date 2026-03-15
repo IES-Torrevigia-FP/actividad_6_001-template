@@ -24,17 +24,29 @@ def azure_openai_chat(endpoint, api_key, deployment, messages):
     if not deployment:
         raise RuntimeError('AZURE_OPENAI_DEPLOYMENT está vacío.')
 
-    # Soporta endpoint base (https://recurso.openai.azure.com)
-    # y endpoint que ya incluya /openai.
+    # Soporta endpoint base (https://recurso.openai.azure.com),
+    # endpoint con /openai, y endpoint v1 con /openai/v1.
     endpoint = endpoint.rstrip('/')
-    if endpoint.endswith('/openai'):
+    if endpoint.endswith('/openai/v1'):
+        url = f"{endpoint}/chat/completions"
+        headers = {"api-key": api_key, "Content-Type": "application/json"}
+        payload = {
+            "model": deployment,
+            "messages": messages,
+            "temperature": 0.2,
+            "max_tokens": 1200,
+        }
+    elif endpoint.endswith('/openai'):
         base = endpoint
+        url = f"{base}/deployments/{deployment}/chat/completions?api-version=2024-08-01-preview"
+        headers = {"api-key": api_key, "Content-Type": "application/json"}
+        payload = {"messages": messages, "temperature": 0.2, "max_tokens": 1200}
     else:
         base = f"{endpoint}/openai"
+        url = f"{base}/deployments/{deployment}/chat/completions?api-version=2024-08-01-preview"
+        headers = {"api-key": api_key, "Content-Type": "application/json"}
+        payload = {"messages": messages, "temperature": 0.2, "max_tokens": 1200}
 
-    url = f"{base}/deployments/{deployment}/chat/completions?api-version=2024-08-01-preview"
-    headers = {"api-key": api_key, "Content-Type": "application/json"}
-    payload = {"messages": messages, "temperature": 0.2, "max_tokens": 1200}
     r = requests.post(url, headers=headers, json=payload, timeout=60)
     try:
         r.raise_for_status()
