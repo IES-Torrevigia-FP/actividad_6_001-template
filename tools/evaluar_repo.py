@@ -17,6 +17,13 @@ def run(cmd: str, cwd: Path | None = None) -> str:
         stderr=subprocess.STDOUT,
     ).decode('utf-8', errors='replace')
 
+def run_git(args: list[str], cwd: Path) -> str:
+    return subprocess.check_output(
+        ['git', *args],
+        cwd=str(cwd),
+        stderr=subprocess.STDOUT,
+    ).decode('utf-8', errors='replace')
+
 def safe_read_text(path: Path) -> str:
     try:
         return path.read_text(encoding='utf-8', errors='ignore')
@@ -70,12 +77,12 @@ def build_tree(root: Path, exclude_dirs: set[str] | None = None) -> str:
 
 def analyze_commits(root: Path) -> dict:
     try:
-        count = int(run("git rev-list --count HEAD", cwd=root).strip())
+        count = int(run_git(['rev-list', '--count', 'HEAD'], cwd=root).strip())
     except Exception:
         count = 0
 
     try:
-        log = run("git log --pretty=format:%h|%an|%ad|%s --date=iso", cwd=root).strip().split('\n')
+        log = run_git(['log', '--pretty=format:%h|%an|%ad|%s', '--date=iso'], cwd=root).strip().split('\n')
     except subprocess.CalledProcessError:
         return {'count': count, 'items': [], 'avg_msg_len': 0, 'quality': 0.0}
     commits = []
@@ -146,10 +153,10 @@ def main():
         min_commits = 3
 
     try:
-        default_branch = run('git symbolic-ref --short refs/remotes/origin/HEAD', cwd=root).strip().split('/', 1)[-1]
+        default_branch = run_git(['symbolic-ref', '--short', 'refs/remotes/origin/HEAD'], cwd=root).strip().split('/', 1)[-1]
     except Exception:
         try:
-            default_branch = run('git rev-parse --abbrev-ref HEAD', cwd=root).strip()
+            default_branch = run_git(['rev-parse', '--abbrev-ref', 'HEAD'], cwd=root).strip()
         except Exception:
             default_branch = '(desconocida)'
 
@@ -254,6 +261,7 @@ def main():
     md.append(f"| Uso de Git | {s_git}/2 |")
     md.append(f"| Evidencias | {s_evid}/2 |")
     md.append(f"| **Total** | **{total}/10** |")
+    md.append('')
 
     if missing:
         md.append('> ⚠️ **Faltan archivos obligatorios:** ' + ', '.join(missing))
@@ -264,6 +272,7 @@ def main():
     md.append(f"- Encabezados: {readme_stats.get('headings',0)}  ")
     md.append(f"- Imágenes: {readme_stats.get('images',0)}  ")
     md.append(f"- Enlaces: {readme_stats.get('links',0)}  ")
+    md.append('')
 
     md.append('## Commits')
     md.append(f"- Número de commits: **{commits_info['count']}**  ")
@@ -275,6 +284,7 @@ def main():
     for c in commits_info['items'][:50]:
         md.append(f"- `{c['short']}` {c['date']} — {c['message']} (score {c['score']})")
     md.append('</details>')
+    md.append('')
 
     md.append('## Evidencias detectadas (heurística)')
     if evidencias_presentes:
@@ -282,11 +292,13 @@ def main():
             md.append(f"- {e}")
     else:
         md.append('- No se detectaron evidencias con la convención esperada.')
+    md.append('')
 
     if files_info['large_files']:
         md.append('## Archivos grandes (>=10MB)')
         for lf in files_info['large_files']:
             md.append(f"- {lf['path']} — {lf['size']} bytes")
+        md.append('')
 
     md.append('## Árbol del repositorio (resumen)')
     md.append('```')

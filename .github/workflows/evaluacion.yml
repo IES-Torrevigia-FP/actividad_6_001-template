@@ -52,10 +52,8 @@ jobs:
           {
             echo "### Informe de evaluación";
             echo "";
-            # Añade dos espacios al final de cada línea para que GitHub Summary
-            # respete los saltos de línea de Markdown y no "aplane" el contenido
             if [ -f reportes/informe.md ]; then
-              sed 's/$/  /' reportes/informe.md;
+              cat reportes/informe.md;
             else
               echo "_No se generó reportes/informe.md por un error en pasos anteriores._";
             fi
