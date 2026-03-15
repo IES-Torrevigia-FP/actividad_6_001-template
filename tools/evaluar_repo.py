@@ -9,8 +9,13 @@ import subprocess
 from pathlib import Path
 from datetime import datetime
 
-def run(cmd: str) -> str:
-    return subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT).decode('utf-8', errors='replace')
+def run(cmd: str, cwd: Path | None = None) -> str:
+    return subprocess.check_output(
+        cmd,
+        shell=True,
+        cwd=str(cwd) if cwd else None,
+        stderr=subprocess.STDOUT,
+    ).decode('utf-8', errors='replace')
 
 def safe_read_text(path: Path) -> str:
     try:
@@ -48,24 +53,31 @@ def is_text_file(path: Path, sample_size: int = 2048) -> bool:
     except Exception:
         return False
 
-def build_tree(root: Path) -> str:
+def build_tree(root: Path, exclude_dirs: set[str] | None = None) -> str:
+    exclude_dirs = exclude_dirs or set()
     lines = []
     for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = [d for d in sorted(dirnames) if d not in exclude_dirs]
         rel = Path(dirpath).relative_to(root)
         indent = '  ' * (0 if rel == Path('.') else len(rel.parts))
-        for d in sorted(dirnames):
+        for d in dirnames:
             lines.append(f"{indent}{d}/")
         for f in sorted(filenames):
             if rel == Path('.') and f.startswith('.') and 'github' not in f:
-                pass
+                continue
             lines.append(f"{indent}{f}")
     return '\n'.join(lines)
 
-def analyze_commits() -> dict:
+def analyze_commits(root: Path) -> dict:
     try:
-        log = run("git log --pretty=format:%h|%an|%ad|%s --date=iso").strip().split('\n')
+        count = int(run("git rev-list --count HEAD", cwd=root).strip())
+    except Exception:
+        count = 0
+
+    try:
+        log = run("git log --pretty=format:%h|%an|%ad|%s --date=iso", cwd=root).strip().split('\n')
     except subprocess.CalledProcessError:
-        return {'count': 0, 'items': [], 'avg_msg_len': 0, 'quality': 0.0}
+        return {'count': count, 'items': [], 'avg_msg_len': 0, 'quality': 0.0}
     commits = []
     quality_scores = []
     for line in log:
@@ -87,26 +99,27 @@ def analyze_commits() -> dict:
         commits.append({'short': short, 'author': author, 'date': date, 'message': msg, 'score': round(score, 2)})
     avg_len = sum(len(c['message']) for c in commits)/len(commits) if commits else 0
     avg_quality = sum(quality_scores)/len(quality_scores) if quality_scores else 0.0
-    return {'count': len(commits), 'items': commits, 'avg_msg_len': round(avg_len, 1), 'quality': round(avg_quality, 2)}
+    return {'count': max(count, len(commits)), 'items': commits, 'avg_msg_len': round(avg_len, 1), 'quality': round(avg_quality, 2)}
 
-def analyze_files(root: Path) -> dict:
+def analyze_files(root: Path, exclude_dirs: set[str] | None = None) -> dict:
+    exclude_dirs = exclude_dirs or set()
     large = []
     binaries = []
     total_files = 0
-    for dirpath, _, filenames in os.walk(root):
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = [d for d in dirnames if d not in exclude_dirs]
         for f in filenames:
             p = Path(dirpath)/f
-            if p.parts[0] == '.git':
-                continue
+            rel = p.relative_to(root)
             total_files += 1
             try:
                 size = p.stat().st_size
             except Exception:
                 size = 0
             if size >= 10*1024*1024:
-                large.append({'path': str(p), 'size': size})
+                large.append({'path': str(rel), 'size': size})
             if not is_text_file(p):
-                binaries.append(str(p))
+                binaries.append(str(rel))
     return {'total_files': total_files, 'large_files': large, 'binary_files': binaries}
 
 def score_section(exists: bool, ok: bool) -> int:
@@ -133,11 +146,14 @@ def main():
         min_commits = 3
 
     try:
-        default_branch = run('git rev-parse --abbrev-ref HEAD').strip()
+        default_branch = run('git symbolic-ref --short refs/remotes/origin/HEAD', cwd=root).strip().split('/', 1)[-1]
     except Exception:
-        default_branch = '(desconocida)'
+        try:
+            default_branch = run('git rev-parse --abbrev-ref HEAD', cwd=root).strip()
+        except Exception:
+            default_branch = '(desconocida)'
 
-    commits_info = analyze_commits()
+    commits_info = analyze_commits(root)
     missing = [f for f in required if not (root / f).exists()]
 
     readme_path = root / 'README.md'
@@ -150,16 +166,19 @@ def main():
     reflex_stats = text_stats(reflex_text) if reflex_text else {'words':0}
     reflex_ok = bool(reflex_text) and reflex_stats['words'] >= 80
 
-    evidencia_candidates = ['cp1', 'cp2', 'cp3', 'cp4', 'notas-git', 'estado', 'staging', 'commit']
+    evidencia_candidates = ['cp1', 'cp2', 'cp3', 'cp4', 'cp5', 'notas-git', 'estado', 'staging', 'commit', 'historial']
     evidencias_presentes = []
     for cand in evidencia_candidates:
         for p in root.rglob(f'*{cand}*'):
+            if outdir.name in p.parts or '.git' in p.parts:
+                continue
             if p.is_file() and p.suffix.lower() in ('.md', '.png', '.jpg', '.jpeg', '.txt', ''):
                 evidencias_presentes.append(str(p.relative_to(root)))
     evidencias_ok = len(set(evidencias_presentes)) >= 3
 
-    files_info = analyze_files(root)
-    arbol = build_tree(root)
+    excluded_dirs = {'.git', outdir.name}
+    files_info = analyze_files(root, exclude_dirs=excluded_dirs)
+    arbol = build_tree(root, exclude_dirs=excluded_dirs)
     (outdir / 'arbol.txt').write_text(arbol, encoding='utf-8')
 
     s_estructura = 2
